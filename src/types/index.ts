@@ -6,6 +6,13 @@ export interface Operario {
   edad: number;
 }
 
+export interface Users {
+  id: number;
+  name: string;
+  email: string;
+  password: string;
+}
+
 export interface Proveedor {
   id: string;
   nit: string;

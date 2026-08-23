@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { fetchProcesos } from "@/services/procesoApi";
 import { 
   Users, 
   Calendar, 
@@ -92,7 +93,7 @@ const AnalisisNominaPage = () => {
       return true;
     });
   }, [procesos, selectedOperarioId, fechaInicio, fechaFin]);
-
+console.log(procesos)
   // Calcular resumen por operario
   const resumenPorOperario = useMemo((): Operario[] => {
     const resumenMap = new Map<string, Operario>();
@@ -123,7 +124,7 @@ const AnalisisNominaPage = () => {
     
     return Array.from(resumenMap.values());
   }, [procesosFiltrados, operarios]);
-
+  console.log(resumenPorOperario)
   // Totales generales
   const totalesGenerales = useMemo(() => {
     return {
@@ -143,10 +144,13 @@ const AnalisisNominaPage = () => {
     }).format(value);
   };
 
-  const getProductoNombre = (id: string) => {
+  const getProductoNombre = (id: number) => {
+    console.log(productos)
     const producto = productos.find(p => p.id === id);
     return producto ? producto.nombre : "N/A";
   };
+
+  console.log(getProductoNombre(1))
 
   const limpiarFiltros = () => {
     setOperarioFilter("");
@@ -193,7 +197,7 @@ const AnalisisNominaPage = () => {
           </p>
         </div>
 
-        {/* Filtros */}
+        {/* Filtros 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -206,7 +210,7 @@ const AnalisisNominaPage = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Filtro por operario con autocompletado */}
+              {/* Filtro por operario con autocompletado 
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
@@ -272,7 +276,7 @@ const AnalisisNominaPage = () => {
                 </Popover>
               </div>
 
-              {/* Fecha inicio */}
+              {/* Fecha inicio 
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
@@ -303,7 +307,7 @@ const AnalisisNominaPage = () => {
                 </Popover>
               </div>
 
-              {/* Fecha fin */}
+              {/* Fecha fin 
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
@@ -334,7 +338,7 @@ const AnalisisNominaPage = () => {
                 </Popover>
               </div>
 
-              {/* Botón limpiar */}
+              {/* Botón limpiar 
               <div className="space-y-2">
                 <Label className="invisible">Acciones</Label>
                 <Button 
@@ -370,7 +374,7 @@ const AnalisisNominaPage = () => {
           </CardContent>
         </Card>
 
-        {/* Resumen de Liquidación */}
+        Resumen de Liquidación */}
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -398,11 +402,11 @@ const AnalisisNominaPage = () => {
               </div>
               <div className="bg-background rounded-lg p-4 text-center border">
                 <p className="text-sm text-muted-foreground">Kg Procesados</p>
-                <p className="text-2xl font-bold text-foreground">{totalesGenerales.totalKgProcesados.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-foreground">{totalesGenerales.totalKgProcesados}</p>
               </div>
               <div className="bg-background rounded-lg p-4 text-center border">
                 <p className="text-sm text-muted-foreground">Kg Resultantes</p>
-                <p className="text-2xl font-bold text-foreground">{totalesGenerales.totalKgResultantes.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-foreground">{totalesGenerales.totalKgResultantes}</p>
               </div>
               <div className="bg-primary/10 rounded-lg p-4 text-center border border-primary/30">
                 <p className="text-sm text-muted-foreground">Total Nómina</p>
@@ -413,42 +417,16 @@ const AnalisisNominaPage = () => {
         </Card>
 
         {/* Resumen por Operario */}
-        {resumenPorOperario.length > 0 ? (
+        {procesos.length > 0 ? (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <ClipboardList className="h-5 w-5" />
               Detalle por Operario
             </h2>
             
-            {resumenPorOperario.map((resumen) => (
-              <Card key={resumen.identificacion_operario}>
-                <CardHeader>
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Users className="h-5 w-5" />
-                        {resumen.operario.nombre} {resumen.operario.apellidos}
-                      </CardTitle>
-                      <CardDescription>
-                        ID: {resumen.operario.operario_identificacion} | {resumen.totalProcesos} proceso(s) en el período
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-4">
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Kg Procesados</p>
-                        <p className="text-lg font-semibold">{resumen.totalKgProcesados.toFixed(2)}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Kg Resultantes</p>
-                        <p className="text-lg font-semibold">{resumen.totalKgResultantes.toFixed(2)}</p>
-                      </div>
-                      <div className="text-center bg-primary/10 rounded-lg px-4 py-2">
-                        <p className="text-sm text-muted-foreground">Total a Pagar</p>
-                        <p className="text-lg font-bold text-primary">{formatCurrency(resumen.totalCostoManoObra)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
+            
+              <Card key={procesos.identificacion_operario}>
+
                 <CardContent>
                   <Table>
                     <TableHeader>
@@ -464,35 +442,35 @@ const AnalisisNominaPage = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {resumen.procesos.map((proceso) => (
+                      {procesos.map((proceso) => (
                         <TableRow key={proceso.id}>
                           <TableCell>{proceso.fecha_proceso}</TableCell>
-                          <TableCell>{getProductoNombre(proceso.productoOrigenId)}</TableCell>
-                          <TableCell>{getProductoNombre(proceso.productoDestinoId)}</TableCell>
-                          <TableCell className="text-right">{proceso.kgEntrada.toFixed(2)}</TableCell>
+                          <TableCell>{getProductoNombre(parseInt(proceso.producto_procesar))}</TableCell>
+                          <TableCell>{getProductoNombre(parseInt(proceso.producto_procesado))}</TableCell>
+                          <TableCell className="text-right">{proceso.kg_procesar}</TableCell>
                           <TableCell className="text-right">
-                            <Badge variant="secondary">{proceso.porcentajeMerma}%</Badge>
+                            <Badge variant="secondary">{proceso.porcentaje_merma}%</Badge>
                           </TableCell>
-                          <TableCell className="text-right">{proceso.kgSalida.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(proceso.costoPorKg)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(proceso.costoTotal)}</TableCell>
+                          <TableCell className="text-right">{proceso.kg_resultado}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(proceso.costo_kg)}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(proceso.costo_total_proceso)}</TableCell>
                         </TableRow>
                       ))}
                       <TableRow className="bg-muted/50 font-medium">
-                        <TableCell colSpan={3}>Subtotal {resumen.operario.nombre}</TableCell>
-                        <TableCell className="text-right">{resumen.totalKgProcesados.toFixed(2)}</TableCell>
+                        <TableCell colSpan={3}>Subtotal {procesos.nombre}</TableCell>
+                        <TableCell className="text-right">{procesos.totalKgProcesados}</TableCell>
                         <TableCell></TableCell>
-                        <TableCell className="text-right">{resumen.totalKgResultantes.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{procesos.totalKgResultantes}</TableCell>
                         <TableCell></TableCell>
                         <TableCell className="text-right text-primary font-bold">
-                          {formatCurrency(resumen.totalCostoManoObra)}
+                          {formatCurrency(totalesGenerales.totalCostoManoObra)}
                         </TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
                 </CardContent>
               </Card>
-            ))}
+            
           </div>
         ) : (
           <Card>

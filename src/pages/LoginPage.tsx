@@ -7,6 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/sonner";
 import { Leaf, Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { fetchUsuarios } from "@/services/authService";
+import { Users } from "@/types";
+
+
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -16,22 +20,32 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!email || !password) {
-      toast.error("Por favor complete todos los campos");
-      return;
-    }
 
-    setIsLoading(true);
-    
-    // Simular autenticación - esto se reemplazará con Lovable Cloud
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success("¡Bienvenido al Sistema CLEM!");
-      navigate("/");
-    }, 1500);
+    console.log("Email:", email);
+    console.log("Password:", password);
+    try {
+      const usuarios: Users[] = await fetchUsuarios();
+      console.log(usuarios)
+      // Ajusta "usuario" y "password" a los nombres reales de tus campos en el JSON
+      const usuarioEncontrado = usuarios.find(
+        (u) => u.email === email
+      );
+      console.log("Usuario encontrado:", usuarioEncontrado);
+      if (usuarioEncontrado) {
+        console.log("Usuario autenticado:", usuarioEncontrado.email);
+        navigate("/", { replace: true });
+      } else {
+        console.log("Email o contraseña incorrectos");
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+
+    }
   };
 
   return (
