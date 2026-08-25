@@ -71,20 +71,20 @@ const AnalisisNominaPage = () => {
     return procesos.filter(proceso => {
       // Filtro por operario (por ID seleccionado)
       if (selectedOperarioId) {
-        if (proceso.operarioId !== selectedOperarioId) {
+        if (String(proceso.identificacion_operario) !== String(selectedOperarioId)) {
           return false;
         }
       }
       
       // Filtro por fecha inicio
       if (fechaInicio) {
-        const fechaProceso = new Date(proceso.fecha);
+        const fechaProceso = new Date(proceso.fecha_proceso);
         if (fechaProceso < fechaInicio) return false;
       }
       
       // Filtro por fecha fin
       if (fechaFin) {
-        const fechaProceso = new Date(proceso.fecha);
+        const fechaProceso = new Date(proceso.fecha_proceso);
         const fechaFinAjustada = new Date(fechaFin);
         fechaFinAjustada.setHours(23, 59, 59, 999);
         if (fechaProceso > fechaFinAjustada) return false;
@@ -93,18 +93,21 @@ const AnalisisNominaPage = () => {
       return true;
     });
   }, [procesos, selectedOperarioId, fechaInicio, fechaFin]);
-console.log(procesos)
+
   // Calcular resumen por operario
-  const resumenPorOperario = useMemo((): Operario[] => {
-    const resumenMap = new Map<string, Operario>();
+  const resumenPorOperario = useMemo((): ResumenOperario[] => {
+    const resumenMap = new Map<string, ResumenOperario>();
     
     procesosFiltrados.forEach(proceso => {
-      const operario = operarios.find(o => o.id === proceso.identifiacion_operario);
+      const operarioKey = String(proceso.identificacion_operario);
+      const operario = operarios.find(
+        o => String(o.id) === operarioKey || String(o.identificacion) === operarioKey
+      );
       if (!operario) return;
       
-      if (!resumenMap.has(proceso.operarioId)) {
-        resumenMap.set(proceso.operarioId, {
-          operarioId: proceso.operarioId,
+      if (!resumenMap.has(operarioKey)) {
+        resumenMap.set(operarioKey, {
+          operarioId: operarioKey,
           operario,
           totalProcesos: 0,
           totalKgProcesados: 0,
@@ -114,11 +117,11 @@ console.log(procesos)
         });
       }
       
-      const resumen = resumenMap.get(proceso.operarioId)!;
+      const resumen = resumenMap.get(operarioKey)!;
       resumen.totalProcesos += 1;
-      resumen.totalKgProcesados += proceso.kgEntrada;
-      resumen.totalKgResultantes += proceso.kgSalida;
-      resumen.totalCostoManoObra += proceso.costoTotal;
+      resumen.totalKgProcesados += proceso.kg_procesar;
+      resumen.totalKgResultantes += proceso.kg_resultado;
+      resumen.totalCostoManoObra += proceso.costo_total_proceso;
       resumen.procesos.push(proceso);
     });
     
@@ -150,12 +153,13 @@ console.log(procesos)
     return producto ? producto.nombre : "N/A";
   };
 
-  const getOperarioNombre = (id: string) => {
-    const operario = operarios.find(o => o.id === id);
+  const getOperarioNombrePorIdentificacion = (identificacion: string | number) => {
+    const key = String(identificacion);
+    const operario = operarios.find(
+      o => String(o.id) === key || String(o.identificacion) === key
+    );
     return operario ? `${operario.nombre} ${operario.apellidos}` : "N/A";
-  }
-
-  console.log(getProductoNombre(1))
+  };
 
   const limpiarFiltros = () => {
     setOperarioFilter("");
@@ -165,6 +169,14 @@ console.log(procesos)
   };
 
   const tienesFiltrosActivos = selectedOperarioId !== null || fechaInicio || fechaFin;
+
+  // Últimos 10 registros (sin filtros), del más reciente al más antiguo.
+  // Evita traer/agrupar TODOS los procesos de TODOS los operarios cuando no hay filtro activo.
+  const ultimosProcesos = useMemo(() => {
+    return [...procesos]
+      .sort((a, b) => new Date(b.fecha_proceso).getTime() - new Date(a.fecha_proceso).getTime())
+      .slice(0, 10);
+  }, [procesos]);
 
   // Operarios filtrados por texto de búsqueda
   const operariosFiltrados = useMemo(() => {
@@ -202,7 +214,7 @@ console.log(procesos)
           </p>
         </div>
 
-        {/* Filtros 
+        {/* Filtros */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -215,7 +227,7 @@ console.log(procesos)
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Filtro por operario con autocompletado 
+              {/* Filtro por operario con autocompletado */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
@@ -281,7 +293,7 @@ console.log(procesos)
                 </Popover>
               </div>
 
-              {/* Fecha inicio 
+              {/* Fecha inicio */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
@@ -312,7 +324,7 @@ console.log(procesos)
                 </Popover>
               </div>
 
-              {/* Fecha fin 
+              {/* Fecha fin */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
@@ -343,7 +355,7 @@ console.log(procesos)
                 </Popover>
               </div>
 
-              {/* Botón limpiar 
+              {/* Botón limpiar */}
               <div className="space-y-2">
                 <Label className="invisible">Acciones</Label>
                 <Button 
@@ -379,7 +391,7 @@ console.log(procesos)
           </CardContent>
         </Card>
 
-        Resumen de Liquidación */}
+        {/* Resumen de Liquidación */}
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -422,62 +434,135 @@ console.log(procesos)
         </Card>
 
         {/* Resumen por Operario */}
-        {procesos.length > 0 ? (
+        {tienesFiltrosActivos ? (
+          procesosFiltrados.length > 0 ? (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Detalle por Operario
+              </h2>
+
+              {resumenPorOperario.map((resumen) => (
+                <Card key={resumen.operarioId}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      {resumen.operario.nombre} {resumen.operario.apellidos}
+                    </CardTitle>
+                    <CardDescription>
+                      {resumen.totalProcesos} proceso{resumen.totalProcesos !== 1 ? "s" : ""}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Operario</TableHead>
+                          <TableHead>Producto Origen</TableHead>
+                          <TableHead>Producto Destino</TableHead>
+                          <TableHead className="text-right">Kg Entrada</TableHead>
+                          <TableHead className="text-right">Merma %</TableHead>
+                          <TableHead className="text-right">Kg Salida</TableHead>
+                          <TableHead className="text-right">Costo/Kg</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {resumen.procesos.map((proceso) => (
+                          <TableRow key={proceso.id}>
+                            <TableCell>{proceso.fecha_proceso}</TableCell>
+                            <TableCell>{resumen.operario.nombre} {resumen.operario.apellidos}</TableCell>
+                            <TableCell>{getProductoNombre(parseInt(proceso.producto_procesar))}</TableCell>
+                            <TableCell>{getProductoNombre(parseInt(proceso.producto_procesado))}</TableCell>
+                            <TableCell className="text-right">{proceso.kg_procesar}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{proceso.porcentaje_merma}%</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">{proceso.kg_resultado}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(proceso.costo_kg)}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(proceso.costo_total_proceso)}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted/50 font-medium">
+                          <TableCell colSpan={4}>
+                            Subtotal {resumen.operario.nombre} {resumen.operario.apellidos}
+                          </TableCell>
+                          <TableCell className="text-right">{resumen.totalKgProcesados}</TableCell>
+                          <TableCell></TableCell>
+                          <TableCell className="text-right">{resumen.totalKgResultantes}</TableCell>
+                          <TableCell></TableCell>
+                          <TableCell className="text-right text-primary font-bold">
+                            {formatCurrency(resumen.totalCostoManoObra)}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center text-muted-foreground">
+                  <Factory className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium">No hay procesos registrados</p>
+                  <p className="text-sm">
+                    No se encontraron procesos con los filtros seleccionados. Intente ajustar los criterios de búsqueda.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        ) : ultimosProcesos.length > 0 ? (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <ClipboardList className="h-5 w-5" />
-              Detalle por Operario
+              Últimos Registros
             </h2>
-            
-            
-              <Card key={procesos.identificacion_operario}>
 
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Operario</TableHead>
-                        <TableHead>Producto Origen</TableHead>
-                        <TableHead>Producto Destino</TableHead>
-                        <TableHead className="text-right">Kg Entrada</TableHead>
-                        <TableHead className="text-right">Merma %</TableHead>
-                        <TableHead className="text-right">Kg Salida</TableHead>
-                        <TableHead className="text-right">Costo/Kg</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {procesos.map((proceso) => (
-                        <TableRow key={proceso.id}>
-                          <TableCell>{proceso.fecha_proceso}</TableCell>
-                          <TableCell>{getOperarioNombre(parseInt(proceso.identificacion_operario))}</TableCell>
-                          <TableCell>{getProductoNombre(parseInt(proceso.producto_procesar))}</TableCell>
-                          <TableCell>{getProductoNombre(parseInt(proceso.producto_procesado))}</TableCell>
-                          <TableCell className="text-right">{proceso.kg_procesar}</TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant="secondary">{proceso.porcentaje_merma}%</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{proceso.kg_resultado}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(proceso.costo_kg)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(proceso.costo_total_proceso)}</TableCell>
-                        </TableRow>
-                      ))}
-                      <TableRow className="bg-muted/50 font-medium">
-                        <TableCell colSpan={3}>Subtotal {procesos.nombre}</TableCell>
-                        <TableCell className="text-right">{procesos.totalKgProcesados}</TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="text-right">{procesos.totalKgResultantes}</TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="text-right text-primary font-bold">
-                          {formatCurrency(totalesGenerales.totalCostoManoObra)}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>
+                  Mostrando los {ultimosProcesos.length} procesos más recientes. Use los filtros para ver el detalle agrupado por operario.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Operario</TableHead>
+                      <TableHead>Producto Origen</TableHead>
+                      <TableHead>Producto Destino</TableHead>
+                      <TableHead className="text-right">Kg Entrada</TableHead>
+                      <TableHead className="text-right">Merma %</TableHead>
+                      <TableHead className="text-right">Kg Salida</TableHead>
+                      <TableHead className="text-right">Costo/Kg</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ultimosProcesos.map((proceso) => (
+                      <TableRow key={proceso.id}>
+                        <TableCell>{proceso.fecha_proceso}</TableCell>
+                        <TableCell>{getOperarioNombrePorIdentificacion(proceso.identificacion_operario)}</TableCell>
+                        <TableCell>{getProductoNombre(parseInt(proceso.producto_procesar))}</TableCell>
+                        <TableCell>{getProductoNombre(parseInt(proceso.producto_procesado))}</TableCell>
+                        <TableCell className="text-right">{proceso.kg_procesar}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="secondary">{proceso.porcentaje_merma}%</Badge>
                         </TableCell>
+                        <TableCell className="text-right">{proceso.kg_resultado}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(proceso.costo_kg)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(proceso.costo_total_proceso)}</TableCell>
                       </TableRow>
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </div>
         ) : (
           <Card>
@@ -486,9 +571,7 @@ console.log(procesos)
                 <Factory className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">No hay procesos registrados</p>
                 <p className="text-sm">
-                  {tienesFiltrosActivos 
-                    ? "No se encontraron procesos con los filtros seleccionados. Intente ajustar los criterios de búsqueda."
-                    : "Registre procesos en el módulo de Producción para ver el análisis de mano de obra aquí."}
+                  Registre procesos en el módulo de Producción para ver el análisis de mano de obra aquí.
                 </p>
               </div>
             </CardContent>
