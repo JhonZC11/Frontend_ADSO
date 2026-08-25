@@ -150,6 +150,11 @@ console.log(procesos)
     return producto ? producto.nombre : "N/A";
   };
 
+  const getOperarioNombre = (id: string) => {
+    const operario = operarios.find(o => o.id === id);
+    return operario ? `${operario.nombre} ${operario.apellidos}` : "N/A";
+  }
+
   console.log(getProductoNombre(1))
 
   const limpiarFiltros = () => {
@@ -432,6 +437,7 @@ console.log(procesos)
                     <TableHeader>
                       <TableRow>
                         <TableHead>Fecha</TableHead>
+                        <TableHead>Operario</TableHead>
                         <TableHead>Producto Origen</TableHead>
                         <TableHead>Producto Destino</TableHead>
                         <TableHead className="text-right">Kg Entrada</TableHead>
@@ -445,6 +451,7 @@ console.log(procesos)
                       {procesos.map((proceso) => (
                         <TableRow key={proceso.id}>
                           <TableCell>{proceso.fecha_proceso}</TableCell>
+                          <TableCell>{getOperarioNombre(parseInt(proceso.identificacion_operario))}</TableCell>
                           <TableCell>{getProductoNombre(parseInt(proceso.producto_procesar))}</TableCell>
                           <TableCell>{getProductoNombre(parseInt(proceso.producto_procesado))}</TableCell>
                           <TableCell className="text-right">{proceso.kg_procesar}</TableCell>
