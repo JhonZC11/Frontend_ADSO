@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, X, Trash2, ShoppingCart, DollarSign, Package, FileText, Pause } from "lucide-react";
+import { CalendarIcon, X, Trash2, ShoppingCart, DollarSign, Package, FileText, Pause, Users, Pencil, Phone, Mail, MapPin, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import { VentaItem, Venta } from "@/types";
 import { toast } from "sonner";
 import { inventoryService } from "@/services/inventoryService";
 import { createVenta, fetchVentas } from "@/services/ventaService";
+import { fetchClientes, createCliente, updateCliente, deleteCliente, Cliente } from "@/services/clienteApi";
 
 
 const getProductosFromInventory = () => {
@@ -56,7 +57,106 @@ export default function VentasPage() {
   const [stockDisponible, setStockDisponible] = useState<number | null>(null);
 
   const [ventas, setVentas] = useState<Venta[]>([]);
-  const [showHistorial, setShowHistorial] = useState(false);
+  const [vista, setVista] = useState<"venta" | "historial" | "clientes">("venta");
+
+  // --- Registro de Clientes ---
+  const clienteFormInicial = {
+    nombre: "",
+    apellidos: "",
+    identificacion: "",
+    telefono: "",
+    email: "",
+    direccion: "",
+    notas: "",
+  };
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clienteForm, setClienteForm] = useState(clienteFormInicial);
+  const [editingClienteId, setEditingClienteId] = useState<number | null>(null);
+  const [clienteFilter, setClienteFilter] = useState("");
+  const [confirmDeleteClienteId, setConfirmDeleteClienteId] = useState<number | null>(null);
+
+  const cargarClientes = async () => {
+    try {
+      const resultado = await fetchClientes();
+      setClientes(resultado);
+      console.log(resultado)
+    } catch (error: any) {
+      showDialog("error", error?.message || "Error al obtener los clientes del servidor");
+    }
+  };
+
+  useEffect(() => {
+    cargarClientes();
+  }, []);
+
+  const clientesFiltrados = clientes.filter((cliente) => {
+    if (!clienteFilter.trim()) return true;
+    const texto = `${cliente.nombre} ${cliente.apellidos} ${cliente.identificacion}`.toLowerCase();
+    return texto.includes(clienteFilter.toLowerCase());
+  });
+
+  const handleClienteFormChange = (field: keyof typeof clienteFormInicial, value: string) => {
+    setClienteForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const limpiarClienteForm = () => {
+    setClienteForm(clienteFormInicial);
+    setEditingClienteId(null);
+  };
+
+  const handleEditarCliente = (cliente: Cliente) => {
+    setEditingClienteId(cliente.id);
+    setClienteForm({
+      nombre: cliente.nombre || "",
+      apellidos: cliente.apellidos || "",
+      identificacion: cliente.identificacion || "",
+      telefono: cliente.telefono || "",
+      email: cliente.email || "",
+      direccion: cliente.direccion || "",
+      notas: cliente.notas || "",
+    });
+  };
+
+  const handleGuardarCliente = async () => {
+    console.log(clienteForm)
+    if (!clienteForm.nombre.trim()) {
+      showDialog("error", "El nombre del cliente es requerido");
+      return;
+    }
+    if (!clienteForm.identificacion.trim()) {
+      showDialog("error", "La identificación del cliente es requerida");
+      return;
+    }
+
+    try {
+      if (editingClienteId) {
+        const actualizado = await updateCliente(editingClienteId, clienteForm);
+        setClientes(prev => prev.map(c => (c.id === editingClienteId ? actualizado : c)));
+        showDialog("success", "Cliente actualizado correctamente");
+      } else {
+        const creado = await createCliente(clienteForm);
+        setClientes(prev => [...prev, creado]);
+        showDialog("success", "Cliente registrado correctamente");
+      }
+      limpiarClienteForm();
+    } catch (error: any) {
+      showDialog("error", error?.message || "Error al guardar el cliente en el servidor");
+    }
+  };
+
+  const handleEliminarCliente = async () => {
+    if (confirmDeleteClienteId === null) return;
+    try {
+      await deleteCliente(confirmDeleteClienteId);
+      setClientes(prev => prev.filter(c => c.id !== confirmDeleteClienteId));
+      showDialog("success", "Cliente eliminado correctamente");
+    } catch (error: any) {
+      showDialog("error", error?.message || "Error al eliminar el cliente");
+    } finally {
+      setConfirmDeleteClienteId(null);
+    }
+  };
+  // --- Fin Registro de Clientes ---
 
   // Filtros del historial de ventas
   const [filtroHistorial, setFiltroHistorial] = useState({
@@ -283,9 +383,26 @@ export default function VentasPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-foreground">Ventas</h2>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowHistorial(!showHistorial)}>
+            <Button
+              variant={vista === "venta" ? "default" : "outline"}
+              onClick={() => setVista("venta")}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Nueva Venta
+            </Button>
+            <Button
+              variant={vista === "historial" ? "default" : "outline"}
+              onClick={() => setVista("historial")}
+            >
               <FileText className="h-4 w-4 mr-2" />
-              {showHistorial ? "Nueva Venta" : "Historial"}
+              Historial
+            </Button>
+            <Button
+              variant={vista === "clientes" ? "default" : "outline"}
+              onClick={() => setVista("clientes")}
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Clientes
             </Button>
             <Button variant="ghost" size="icon" onClick={() => window.history.back()}>
               <X className="h-5 w-5" />
@@ -345,7 +462,7 @@ export default function VentasPage() {
           </Card>
         </div>
 
-        {!showHistorial ? (
+        {vista === "venta" ? (
           <Card>
             <CardContent className="pt-6 space-y-6">
               {/* Header Form */}
@@ -536,7 +653,7 @@ export default function VentasPage() {
               </div>
             </CardContent>
           </Card>
-        ) : (
+        ) : vista === "historial" ? (
           /* Historial de Ventas */
           <Card>
             <CardContent className="pt-6">
@@ -678,6 +795,194 @@ export default function VentasPage() {
               )}
             </CardContent>
           </Card>
+        ) : (
+          /* Registro de Clientes */
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <UserPlus className="h-5 w-5" />
+                  {editingClienteId ? "Editar Cliente" : "Registrar Cliente"}
+                </h3>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cliente-nombre">Nombre</Label>
+                    <Input
+                      id="cliente-nombre"
+                      value={clienteForm.nombre}
+                      onChange={(e) => handleClienteFormChange("nombre", e.target.value)}
+                      placeholder="Nombre"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cliente-apellidos">Apellidos</Label>
+                    <Input
+                      id="cliente-apellidos"
+                      value={clienteForm.apellidos}
+                      onChange={(e) => handleClienteFormChange("apellidos", e.target.value)}
+                      placeholder="Apellidos"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cliente-identificacion">Identificación</Label>
+                    <Input
+                      id="cliente-identificacion"
+                      value={clienteForm.identificacion}
+                      onChange={(e) => handleClienteFormChange("identificacion", e.target.value)}
+                      placeholder="C.C. / NIT"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cliente-telefono">Teléfono</Label>
+                    <Input
+                      id="cliente-telefono"
+                      value={clienteForm.telefono}
+                      onChange={(e) => handleClienteFormChange("telefono", e.target.value)}
+                      placeholder="300 000 0000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cliente-email">Email</Label>
+                    <Input
+                      id="cliente-email"
+                      type="email"
+                      value={clienteForm.email}
+                      onChange={(e) => handleClienteFormChange("email", e.target.value)}
+                      placeholder="correo@ejemplo.com"
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="cliente-direccion">Dirección</Label>
+                    <Input
+                      id="cliente-direccion"
+                      value={clienteForm.direccion}
+                      onChange={(e) => handleClienteFormChange("direccion", e.target.value)}
+                      placeholder="Dirección"
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-2 md:col-span-4">
+                    <Label htmlFor="cliente-notas">Notas</Label>
+                    <Textarea
+                      id="cliente-notas"
+                      value={clienteForm.notas}
+                      onChange={(e) => handleClienteFormChange("notas", e.target.value)}
+                      placeholder="Observaciones adicionales"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2 border-t">
+                  {editingClienteId && (
+                    <Button variant="outline" onClick={limpiarClienteForm}>
+                      Cancelar edición
+                    </Button>
+                  )}
+                  <Button onClick={handleGuardarCliente} className="bg-primary hover:bg-primary/90">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    {editingClienteId ? "Actualizar Cliente" : "Registrar Cliente"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                  <h3 className="text-lg font-semibold">Clientes Registrados</h3>
+                  <div className="w-full sm:w-72">
+                    <Input
+                      value={clienteFilter}
+                      onChange={(e) => setClienteFilter(e.target.value)}
+                      placeholder="Buscar por nombre o identificación..."
+                    />
+                  </div>
+                </div>
+
+                {clientesFiltrados.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p>
+                      {clienteFilter
+                        ? "No hay clientes que coincidan con la búsqueda"
+                        : "No hay clientes registrados aún"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Nombre</TableHead>
+                          <TableHead>Identificación</TableHead>
+                          <TableHead>Teléfono</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Dirección</TableHead>
+                          <TableHead className="w-24"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {clientesFiltrados.map((cliente) => (
+                          <TableRow key={cliente.id}>
+                            <TableCell className="font-medium">
+                              {cliente.nombre} {cliente.apellidos}
+                            </TableCell>
+                            <TableCell>{cliente.identificacion}</TableCell>
+                            <TableCell>
+                              {cliente.telefono ? (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" /> {cliente.telefono}
+                                </span>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {cliente.email ? (
+                                <span className="flex items-center gap-1">
+                                  <Mail className="h-3 w-3" /> {cliente.email}
+                                </span>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {cliente.direccion ? (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" /> {cliente.direccion}
+                                </span>
+                              ) : (
+                                "—"
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1 justify-end">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEditarCliente(cliente)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setConfirmDeleteClienteId(cliente.id)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
 
@@ -706,6 +1011,20 @@ export default function VentasPage() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setConfirmClearOpen(false)}>Cancelar</Button>
             <Button variant="destructive" onClick={handleClearAll}>Limpiar todo</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Delete Cliente */}
+      <Dialog open={confirmDeleteClienteId !== null} onOpenChange={(open) => !open && setConfirmDeleteClienteId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+          </DialogHeader>
+          <p className="py-4">¿Está seguro de eliminar este cliente? Esta acción no se puede deshacer.</p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmDeleteClienteId(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleEliminarCliente}>Eliminar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

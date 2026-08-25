@@ -127,3 +127,15 @@ export interface VentaItem {
   descuento: number;
   total: number;
 }
+
+
+export interface Cliente {
+  id: number;
+  nombre: string;
+  apellidos: string;
+  identificacion: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+  notas?: string;
+}
