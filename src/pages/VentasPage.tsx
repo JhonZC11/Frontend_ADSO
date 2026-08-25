@@ -58,6 +58,51 @@ export default function VentasPage() {
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [showHistorial, setShowHistorial] = useState(false);
 
+  // Filtros del historial de ventas
+  const [filtroHistorial, setFiltroHistorial] = useState({
+    numeroVenta: "",
+    cliente: "",
+    codigo: "",
+    fechaDesde: undefined as Date | undefined,
+    fechaHasta: undefined as Date | undefined,
+  });
+
+  const limpiarFiltrosHistorial = () => {
+    setFiltroHistorial({
+      numeroVenta: "",
+      cliente: "",
+      codigo: "",
+      fechaDesde: undefined,
+      fechaHasta: undefined,
+    });
+  };
+
+  const ventasFiltradas = ventas.filter((venta) => {
+    const fechaVenta = venta.fecha ? new Date(venta.fecha) : null;
+
+    const matchNumero = filtroHistorial.numeroVenta
+      ? venta.numero_venta?.toLowerCase().includes(filtroHistorial.numeroVenta.toLowerCase())
+      : true;
+
+    const matchCliente = filtroHistorial.cliente
+      ? venta.cliente?.toLowerCase().includes(filtroHistorial.cliente.toLowerCase())
+      : true;
+
+    const matchCodigo = filtroHistorial.codigo
+      ? venta.producto_codigo?.toLowerCase().includes(filtroHistorial.codigo.toLowerCase())
+      : true;
+
+    const matchDesde = filtroHistorial.fechaDesde && fechaVenta
+      ? fechaVenta >= filtroHistorial.fechaDesde
+      : true;
+
+    const matchHasta = filtroHistorial.fechaHasta && fechaVenta
+      ? fechaVenta <= filtroHistorial.fechaHasta
+      : true;
+
+    return matchNumero && matchCliente && matchCodigo && matchDesde && matchHasta;
+  });
+
 
   useEffect(() => {
     const cargar = async () => {
@@ -496,10 +541,104 @@ export default function VentasPage() {
           <Card>
             <CardContent className="pt-6">
               <h3 className="text-lg font-semibold mb-4">Historial de Ventas</h3>
-              {ventas.length === 0 ? (
+
+              {/* Filtros de búsqueda */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4 items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="filtro-numero">N° Venta</Label>
+                  <Input
+                    id="filtro-numero"
+                    value={filtroHistorial.numeroVenta}
+                    onChange={(e) => setFiltroHistorial({ ...filtroHistorial, numeroVenta: e.target.value })}
+                    placeholder="V-000001"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="filtro-cliente">Cliente</Label>
+                  <Input
+                    id="filtro-cliente"
+                    value={filtroHistorial.cliente}
+                    onChange={(e) => setFiltroHistorial({ ...filtroHistorial, cliente: e.target.value })}
+                    placeholder="Nombre del cliente"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="filtro-codigo">Código Producto</Label>
+                  <Input
+                    id="filtro-codigo"
+                    value={filtroHistorial.codigo}
+                    onChange={(e) => setFiltroHistorial({ ...filtroHistorial, codigo: e.target.value })}
+                    placeholder="MP-001"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Desde</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !filtroHistorial.fechaDesde && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {filtroHistorial.fechaDesde
+                          ? format(filtroHistorial.fechaDesde, "dd/MM/yyyy", { locale: es })
+                          : "Seleccionar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={filtroHistorial.fechaDesde}
+                        onSelect={(date) => setFiltroHistorial({ ...filtroHistorial, fechaDesde: date })}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <Label>Hasta</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !filtroHistorial.fechaHasta && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {filtroHistorial.fechaHasta
+                          ? format(filtroHistorial.fechaHasta, "dd/MM/yyyy", { locale: es })
+                          : "Seleccionar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={filtroHistorial.fechaHasta}
+                        onSelect={(date) => setFiltroHistorial({ ...filtroHistorial, fechaHasta: date })}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              <div className="flex justify-end mb-4">
+                <Button variant="outline" size="sm" onClick={limpiarFiltrosHistorial}>
+                  <X className="h-4 w-4 mr-2" />
+                  Limpiar filtros
+                </Button>
+              </div>
+
+              {ventasFiltradas.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                  <p>No hay ventas registradas aún</p>
+                  <p>No hay ventas que coincidan con los filtros</p>
                 </div>
               ) : (
                 <div className="border rounded-lg overflow-hidden">
@@ -518,7 +657,7 @@ export default function VentasPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {ventas.map((venta) => (
+                      {ventasFiltradas.map((venta) => (
                         <TableRow key={venta.id}>
                           <TableCell className="font-medium">{venta.numero_venta}</TableCell>
                           <TableCell>{venta.fecha?.slice(0,10)}</TableCell>
